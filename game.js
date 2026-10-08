@@ -40,6 +40,12 @@ function slotFit(slot, pl){
 }
 
 const el = (id)=>document.getElementById(id);
+// Effective rating for a player: career-WAR-only value in WAR-rior mode, else the blended rating.
+function rtOf(pl){
+  if (!pl) return 0;
+  if (typeof S!=="undefined" && S && S.warrior) return (pl.warRating!=null ? pl.warRating : pl.rating);
+  return pl.rating;
+}
 function toast(msg){
   const t=document.createElement("div"); t.className="toast"; t.textContent=msg;
   document.body.appendChild(t); setTimeout(()=>t.remove(),1400);
@@ -102,7 +108,7 @@ let S = null;
 function newState(opts){
   return {
     opp: opts.oppType, eras: opts.eras, hideRatings: opts.hideRatings, cpuDiff: parseFloat(opts.cpuDiff),
-    rerollOn: opts.rerollOn, hintOn: opts.hintOn, draftMode: opts.draftMode,
+    rerollOn: opts.rerollOn, hintOn: opts.hintOn, draftMode: opts.draftMode, warrior: opts.warrior,
     broadInf: opts.broadInf, broadOf: opts.broadOf, lenientRp: opts.lenientRp,
     round: 0, total: SLOTS.length,
     you:  { slots: SLOTS.map(s=>({slot:s,player:null})), score:0, rerolls: opts.rerollCount, hints: opts.hintCount },
@@ -142,8 +148,8 @@ function candidates(side){
     .filter(pl => !taken.has(pl.name+"|"+S.roll.era));
   // dedupe by name, keep best rating
   const byName={};
-  list.forEach(pl=>{ if(!byName[pl.name]||pl.rating>byName[pl.name].rating) byName[pl.name]={...pl, era:S.roll.era, team:S.roll.team}; });
-  return Object.values(byName).sort((a,b)=>b.rating-a.rating);
+  list.forEach(pl=>{ if(!byName[pl.name]||rtOf(pl)>rtOf(byName[pl.name])) byName[pl.name]={...pl, era:S.roll.era, team:S.roll.team}; });
+  return Object.values(byName).sort((a,b)=>rtOf(b)-rtOf(a));
 }
 
 // place a player into the best open slot that accepts them (preference-ranked)
@@ -153,7 +159,7 @@ function placePlayer(side, pl){
   // choose the slot with the highest fit (exact position / real SP|RP before flex)
   openAccept.sort((a,b)=> slotFit(b.slot,pl) - slotFit(a.slot,pl));
   const target = openAccept[0];
-  target.player = pl; S[side].score += pl.rating;
+  target.player = pl; S[side].score += rtOf(pl);
   return true;
 }
 
@@ -176,10 +182,10 @@ function renderRoster(side, mountId){
     d.className="slot "+(s.player?"filled":"open");
     const hide = S.hideRatings;
     const nm = s.player ? `${teamBadge(s.player.team,"sm")} ${s.player.name} <span class="muted">(${s.player.era})</span>` : "<span class='muted'>— open —</span>";
-    d.innerHTML=`<span class="pos">${s.slot}</span><span class="nm">${nm}</span><span class="rt">${s.player?(hide?'·':s.player.rating):""}</span>`;
+    d.innerHTML=`<span class="pos">${s.slot}</span><span class="nm">${nm}</span><span class="rt">${s.player?(hide?'·':rtOf(s.player)):""}</span>`;
     mount.appendChild(d);
   });
-  const tot=S[side].slots.reduce((a,s)=>a+(s.player?s.player.rating:0),0);
+  const tot=S[side].slots.reduce((a,s)=>a+(s.player?rtOf(s.player):0),0);
   const t=document.createElement("div"); t.className="muted"; t.style.marginTop="6px";
   t.innerHTML=`Lineup total: <b>${S.hideRatings?'hidden until final':tot}</b>`; mount.appendChild(t);
 }
@@ -203,7 +209,7 @@ function startGame(){
     rerollOn: el("rerollOn").checked, rerollCount: parseInt(el("rerollCount").value,10),
     hintOn: el("hintOn").checked, hintCount: parseInt(el("hintCount").value,10),
     broadInf: el("broadInf").checked, broadOf: el("broadOf").checked, lenientRp: el("lenientRp").checked,
-    draftMode: el("draftMode").value
+    draftMode: el("draftMode").value, warrior: el("warriorMode").checked
   });
   el("oppLabel").textContent = S.opp==="cpu" ? "CPU" : "P2";
   el("oppRosterTitle").textContent = (S.opp==="cpu"?"CPU":"Player 2")+" lineup";
@@ -405,7 +411,7 @@ function cpuPick(){
     const b=el("cpuBanner"); b.className="cpuBanner";
     b.innerHTML=`${teamBadge(S.roll.team)}<div class="pickline">`+
       `<div class="muted">${S.opp==='cpu'?'CPU':'Player 2'} rolled <b style="color:var(--text)">${TEAMNAME(S.roll.team)}</b> · ${S.roll.era}</div>`+
-      `<div>drafted <b>${pick.name}</b> <span class="muted">${pick.pos}${S.hideRatings?'':' · rating '+pick.rating}</span></div></div>`;
+      `<div>drafted <b>${pick.name}</b> <span class="muted">${pick.pos}${S.hideRatings?'':' · rating '+rtOf(pick)}</span></div></div>`;
     afterPick();
   }, 800);
 }
@@ -451,12 +457,12 @@ function finishGame(){
   let rows="";
   for(let i=0;i<SLOTS.length;i++){
     const y=S.you.slots[i].player, o=S.cpu.slots[i].player;
-    const yr=y?y.rating:0, or=o?o.rating:0;
+    const yr=y?rtOf(y):0, or=o?rtOf(o):0;
     const cls = yr>or?"win":yr<or?"lose":"tie";
     rows+=`<tr><td><b>${SLOTS[i]}</b></td>
-      <td>${y?teamBadge(y.team,"sm")+" "+y.name:"—"} <span class="muted">${y?y.rating:""}</span></td>
+      <td>${y?teamBadge(y.team,"sm")+" "+y.name:"—"} <span class="muted">${y?yr:""}</span></td>
       <td class="${cls}">${yr>or?"▲":yr<or?"▼":"="}</td>
-      <td>${o?teamBadge(o.team,"sm")+" "+o.name:"—"} <span class="muted">${o?o.rating:""}</span></td></tr>`;
+      <td>${o?teamBadge(o.team,"sm")+" "+o.name:"—"} <span class="muted">${o?or:""}</span></td></tr>`;
   }
   r.innerHTML=`<h2 style="margin-top:0">Final — ${verdict}</h2>
     <div class="row" style="gap:30px;margin-bottom:10px">
@@ -496,9 +502,9 @@ function qualifiesHiScore(score){
   if (list.length < HISCORE_MAX) return true;
   return score > list[list.length-1].score;
 }
-function addHiScore(name, score, eras){
+function addHiScore(name, score, eras, mode){
   const list = loadHiScores();
-  list.push({ name: (name||"YOU").slice(0,8).toUpperCase(), score, eras, date: Date.now() });
+  list.push({ name: (name||"YOU").slice(0,8).toUpperCase(), score, eras, mode: mode||"standard", date: Date.now() });
   list.sort((a,b)=> b.score - a.score);
   saveHiScores(list);
   return list.slice(0,HISCORE_MAX);
@@ -513,8 +519,9 @@ function renderHiScores(){
   }
   let rows = list.slice(0,HISCORE_MAX).map((e,i)=>{
     const d = e.date ? new Date(e.date).toLocaleDateString() : "";
+    const modeTag = e.mode==="warrior" ? ' <span title="WAR-rior mode">⚔️</span>' : "";
     return `<tr><td style="padding:2px 8px">${i+1}.</td>`+
-           `<td style="padding:2px 8px"><b>${escapeHtml(e.name)}</b></td>`+
+           `<td style="padding:2px 8px"><b>${escapeHtml(e.name)}</b>${modeTag}</td>`+
            `<td style="padding:2px 8px;text-align:right"><b style="color:var(--accent2,#6cf)">${e.score}</b></td>`+
            `<td style="padding:2px 8px;color:var(--muted,#889);font-size:11px">${d}</td></tr>`;
   }).join("");
@@ -534,7 +541,7 @@ function finishSolo(){
     const y=S.you.slots[i].player;
     rows+=`<tr><td><b>${SLOTS[i]}</b></td>`+
       `<td>${y?teamBadge(y.team,"sm")+" "+y.name+' <span class="muted">('+y.era+')</span>':"—"}</td>`+
-      `<td style="text-align:right"><b>${y?y.rating:0}</b></td></tr>`;
+      `<td style="text-align:right"><b>${y?rtOf(y):0}</b></td></tr>`;
   }
   const headline = beatBest
     ? `<span class="win">🏆 New best lineup!</span>`
@@ -548,9 +555,9 @@ function finishSolo(){
          <span class="muted" id="saveMsg"></span>
        </div>`
     : `<div class="muted" style="margin-top:12px">Not a top-10 score this time — ${best?('beat '+best.score+' to make the board'):''}.</div>`;
-  r.innerHTML=`<h2 style="margin-top:0">Solo — ${headline}</h2>
+  r.innerHTML=`<h2 style="margin-top:0">Solo${S.warrior?' ⚔️ WAR-rior':''} — ${headline}</h2>
     <div class="row" style="gap:30px;margin-bottom:10px">
-      <div><div class="score you">${you}</div><div class="muted">Your lineup total</div></div>
+      <div><div class="score you">${you}</div><div class="muted">${S.warrior?'Total career WAR value':'Your lineup total'}</div></div>
     </div>
     ${saveBlock}
     <table style="margin-top:12px"><tr><th>Slot</th><th>Player</th><th>Rating</th></tr>${rows}</table>
@@ -563,7 +570,7 @@ function finishSolo(){
     btn.onclick=()=>{
       if(saved) return;
       const nm = el("hiName").value.trim() || "YOU";
-      addHiScore(nm, you, (S.eras||[]).join(","));
+      addHiScore(nm, you, (S.eras||[]).join(","), S.warrior?"warrior":"standard");
       saved=true;
       el("hiName").disabled=true; btn.disabled=true;
       el("saveMsg").innerHTML='<span class="win">Saved ✓</span>';
