@@ -287,8 +287,8 @@ function showChoices(){
     box.innerHTML="";
     offer.forEach(pl=>{
       const b=document.createElement("button"); b.className="btn choice";
-      const rt = S.hideRatings ? "" : `<span class="rt">${pl.rating}</span>`;
-      b.innerHTML=`<span>${pl.name} <span class="muted">${pl.pos}</span></span>${rt}`;
+      // multiple-choice always hides the rating on the buttons — pick by knowledge, not by number
+      b.innerHTML=`<span>${pl.name} <span class="muted">${pl.pos}</span></span>`;
       b.onclick=()=>pickChoice(pl);
       box.appendChild(b);
     });
