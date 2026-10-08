@@ -67,7 +67,7 @@
     background:var(--card);border:1px solid var(--accent);padding:10px 18px;
     border-radius:10px;font-weight:700;z-index:50;box-shadow:0 6px 24px #0008}
   select,input{background:#0e1726;color:var(--text);border:1px solid var(--border);
-    border-radius:8px;padding:7px 9px;font-size:14px}
+    border-radius:8px;padding:7px 9px;font-size:16px}
   table{width:100%;border-collapse:collapse;font-size:14px}
   td,th{padding:6px 8px;border-bottom:1px solid var(--border);text-align:left}
   th{color:var(--muted);font-weight:600}
@@ -115,6 +115,7 @@
     <div class="row" style="margin-bottom:12px">
       <label>Opponent:
         <select id="oppType">
+          <option value="solo">Solo (no opponent — beat your high score)</option>
           <option value="cpu">vs Computer</option>
           <option value="human">vs Player (pass &amp; play)</option>
         </select>
@@ -170,6 +171,13 @@
       Lineup: C, 1B, 2B, SS, 3B, OF, OF, OF, UTL, DH + 3 Starters, 2 Relievers (15 picks each).
       Each round a team is rolled; pick an eligible player for an open slot.
     </div>
+    <div id="hiScorePanel" style="margin-top:16px;border-top:1px solid var(--line,#2a2f45);padding-top:12px">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <h4 style="margin:0">🏆 Solo High Scores</h4>
+        <button class="btn" id="clearHiScores" style="font-size:12px;padding:4px 10px">Clear</button>
+      </div>
+      <div id="hiScoreList" class="muted" style="margin-top:8px;font-size:13px">No solo scores yet — play a Solo game to set one.</div>
+    </div>
   </div>
 
   <!-- DRAFT GAME -->
@@ -180,8 +188,8 @@
              <span class="pill" id="roundPill">Round 1 / 13</span></div>
         <div class="row">
           <div style="text-align:center"><div class="score you" id="scoreYou">0</div><div class="muted">You</div></div>
-          <div style="font-size:22px" class="muted">vs</div>
-          <div style="text-align:center"><div class="score opp" id="scoreOpp">0</div><div class="muted" id="oppLabel">CPU</div></div>
+          <div style="font-size:22px" class="muted" id="vsSep">vs</div>
+          <div style="text-align:center" id="oppScoreCol"><div class="score opp" id="scoreOpp">0</div><div class="muted" id="oppLabel">CPU</div></div>
         </div>
       </div>
       <div class="teamroll" id="teamRoll">—<small id="eraRoll"></small></div>
@@ -207,9 +215,9 @@
       </div>
     </div>
 
-    <div class="grid2">
+    <div class="grid2" id="lineupGrid">
       <div class="card"><h4 style="margin-top:0">Your lineup</h4><div id="youRoster"></div></div>
-      <div class="card"><h4 style="margin-top:0" id="oppRosterTitle">CPU lineup</h4><div id="oppRoster"></div></div>
+      <div class="card" id="oppRosterCard"><h4 style="margin-top:0" id="oppRosterTitle">CPU lineup</h4><div id="oppRoster"></div></div>
     </div>
   </div>
 
