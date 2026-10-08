@@ -188,7 +188,8 @@ function updateScores(){
   el("scoreOpp").textContent=S.cpu.score;
 }
 function renderTurn(){
-  el("turnPill").textContent = S.turn==="you" ? "Your pick" : (S.opp==="cpu"?"CPU pick":"Player 2 pick");
+  el("turnPill").textContent = S.opp==="solo" ? "Your pick" :
+    (S.turn==="you" ? "Your pick" : (S.opp==="cpu"?"CPU pick":"Player 2 pick"));
   el("roundPill").textContent = `Round ${Math.min(S.round+1,S.total)} / ${S.total}`;
 }
 
@@ -206,17 +207,23 @@ function startGame(){
   });
   el("oppLabel").textContent = S.opp==="cpu" ? "CPU" : "P2";
   el("oppRosterTitle").textContent = (S.opp==="cpu"?"CPU":"Player 2")+" lineup";
+  // Solo mode: hide everything about an opponent, show a single lineup column.
+  const solo = S.opp==="solo";
+  el("oppScoreCol").style.display = solo ? "none" : "";
+  el("vsSep").style.display = solo ? "none" : "";
+  el("oppRosterCard").style.display = solo ? "none" : "";
+  el("lineupGrid").style.gridTemplateColumns = solo ? "1fr" : "";
   el("setup").classList.add("hidden");
   el("result").classList.add("hidden");
   el("trivia").classList.add("hidden");
   el("game").classList.remove("hidden");
-  renderRoster("you","youRoster"); renderRoster("cpu","oppRoster");
+  renderRoster("you","youRoster"); if(!solo) renderRoster("cpu","oppRoster");
   updateScores(); renderTurn();
   el("pickArea").classList.add("hidden");
   el("cpuBanner").classList.add("hidden");
   el("teamRoll").innerHTML='—<small></small>';
-  if (S.opp==="cpu"){
-    // vs Computer: no manual roll — the game auto-rolls each turn.
+  if (S.opp==="cpu" || solo){
+    // vs Computer AND solo: no manual roll — the game auto-rolls each turn.
     el("rollBtn").style.display="none";
     el("rollBtn").disabled=true;
     setTimeout(doRoll, 500);
@@ -280,8 +287,8 @@ function showChoices(){
     box.innerHTML="";
     offer.forEach(pl=>{
       const b=document.createElement("button"); b.className="btn choice";
-      const rt = S.hideRatings ? "" : `<span class="rt">${pl.rating}</span>`;
-      b.innerHTML=`<span>${pl.name} <span class="muted">${pl.pos}</span></span>${rt}`;
+      // multiple-choice always hides the rating on the buttons — pick by knowledge, not by number
+      b.innerHTML=`<span>${pl.name} <span class="muted">${pl.pos}</span></span>`;
       b.onclick=()=>pickChoice(pl);
       box.appendChild(b);
     });
@@ -404,8 +411,18 @@ function cpuPick(){
 }
 
 function afterPick(){
-  renderRoster("you","youRoster"); renderRoster("cpu","oppRoster");
+  renderRoster("you","youRoster"); if(S.opp!=="solo") renderRoster("cpu","oppRoster");
   updateScores();
+  if (S.opp==="solo"){
+    // solo: no opponent turn — each pick is one round
+    S.round++;
+    renderTurn();
+    if (S.round>=S.total){ finishGame(); return; }
+    el("teamRoll").innerHTML='—<small></small>';
+    el("rollBtn").disabled=true;
+    setTimeout(doRoll, 500);
+    return;
+  }
   // advance turn: you -> opp (same round), opp -> next round
   if (S.turn==="you"){ S.turn="cpu"; }
   else { S.turn="you"; S.round++; }
@@ -424,6 +441,7 @@ function afterPick(){
 }
 
 function finishGame(){
+  if (S.opp==="solo"){ finishSolo(); return; }
   el("game").classList.add("hidden");
   const r=el("result"); r.classList.remove("hidden");
   const you=S.you.score, opp=S.cpu.score;
@@ -455,6 +473,103 @@ function finishGame(){
 function showSetup(){
   el("game").classList.add("hidden"); el("result").classList.add("hidden");
   el("trivia").classList.add("hidden"); el("setup").classList.remove("hidden");
+  renderHiScores();
+}
+
+// ---------- solo mode + local high scores ----------
+const HISCORE_KEY = "mlbDraftDuel.hiscores.v1";
+const HISCORE_MAX = 10;
+function loadHiScores(){
+  try {
+    const raw = localStorage.getItem(HISCORE_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr : [];
+  } catch(e){ return []; }
+}
+function saveHiScores(list){
+  try { localStorage.setItem(HISCORE_KEY, JSON.stringify(list.slice(0,HISCORE_MAX))); }
+  catch(e){ /* storage unavailable (private mode) — scores just won't persist */ }
+}
+// Is `score` good enough to make the board? (board not full, or beats the lowest)
+function qualifiesHiScore(score){
+  const list = loadHiScores();
+  if (list.length < HISCORE_MAX) return true;
+  return score > list[list.length-1].score;
+}
+function addHiScore(name, score, eras){
+  const list = loadHiScores();
+  list.push({ name: (name||"YOU").slice(0,8).toUpperCase(), score, eras, date: Date.now() });
+  list.sort((a,b)=> b.score - a.score);
+  saveHiScores(list);
+  return list.slice(0,HISCORE_MAX);
+}
+function renderHiScores(){
+  const mount = el("hiScoreList");
+  if (!mount) return;
+  const list = loadHiScores();
+  if (!list.length){
+    mount.innerHTML = "No solo scores yet — play a Solo game to set one.";
+    return;
+  }
+  let rows = list.slice(0,HISCORE_MAX).map((e,i)=>{
+    const d = e.date ? new Date(e.date).toLocaleDateString() : "";
+    return `<tr><td style="padding:2px 8px">${i+1}.</td>`+
+           `<td style="padding:2px 8px"><b>${escapeHtml(e.name)}</b></td>`+
+           `<td style="padding:2px 8px;text-align:right"><b style="color:var(--accent2,#6cf)">${e.score}</b></td>`+
+           `<td style="padding:2px 8px;color:var(--muted,#889);font-size:11px">${d}</td></tr>`;
+  }).join("");
+  mount.innerHTML = `<table style="border-collapse:collapse">${rows}</table>`;
+}
+
+function finishSolo(){
+  el("game").classList.add("hidden");
+  const r=el("result"); r.classList.remove("hidden");
+  const you=S.you.score;
+  const qualifies = qualifiesHiScore(you);
+  const best = loadHiScores()[0];
+  const beatBest = !best || you > best.score;
+  // lineup breakdown (single column, no opponent)
+  let rows="";
+  for(let i=0;i<SLOTS.length;i++){
+    const y=S.you.slots[i].player;
+    rows+=`<tr><td><b>${SLOTS[i]}</b></td>`+
+      `<td>${y?teamBadge(y.team,"sm")+" "+y.name+' <span class="muted">('+y.era+')</span>':"—"}</td>`+
+      `<td style="text-align:right"><b>${y?y.rating:0}</b></td></tr>`;
+  }
+  const headline = beatBest
+    ? `<span class="win">🏆 New best lineup!</span>`
+    : qualifies ? `<span class="win">Top 10 lineup! 🎉</span>`
+    : `<span class="tie">Lineup complete</span>`;
+  const saveBlock = qualifies
+    ? `<div class="row" style="margin-top:12px;gap:8px;align-items:center">
+         <input id="hiName" type="text" maxlength="8" placeholder="Your initials"
+                style="width:140px" autocomplete="off" />
+         <button class="btn primary" id="saveHiBtn">Save score</button>
+         <span class="muted" id="saveMsg"></span>
+       </div>`
+    : `<div class="muted" style="margin-top:12px">Not a top-10 score this time — ${best?('beat '+best.score+' to make the board'):''}.</div>`;
+  r.innerHTML=`<h2 style="margin-top:0">Solo — ${headline}</h2>
+    <div class="row" style="gap:30px;margin-bottom:10px">
+      <div><div class="score you">${you}</div><div class="muted">Your lineup total</div></div>
+    </div>
+    ${saveBlock}
+    <table style="margin-top:12px"><tr><th>Slot</th><th>Player</th><th>Rating</th></tr>${rows}</table>
+    <div class="row" style="margin-top:14px">
+      <button class="btn primary" onclick="startGame()">Play again</button>
+      <button class="btn" onclick="showSetup()">New Setup</button>
+    </div>`;
+  if (qualifies){
+    const btn=el("saveHiBtn"); let saved=false;
+    btn.onclick=()=>{
+      if(saved) return;
+      const nm = el("hiName").value.trim() || "YOU";
+      addHiScore(nm, you, (S.eras||[]).join(","));
+      saved=true;
+      el("hiName").disabled=true; btn.disabled=true;
+      el("saveMsg").innerHTML='<span class="win">Saved ✓</span>';
+    };
+    setTimeout(()=>{ const n=el("hiName"); if(n) n.focus(); }, 100);
+  }
 }
 
 // ---------- trivia mode ----------
@@ -522,3 +637,10 @@ el("rerollBtn").onclick=doReroll;
 el("hintBtn").onclick=doHint;
 el("nameInput").addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); submitTypedName(); } });
 el("oppType").onchange=()=>{ el("cpuDiffWrap").style.display = el("oppType").value==="cpu"?"":"none"; };
+// high-score panel: clear button + initial render
+el("clearHiScores").onclick=()=>{
+  if (confirm("Clear all saved solo high scores?")){ saveHiScores([]); renderHiScores(); }
+};
+renderHiScores();
+// reflect the default opponent selection (solo) on load — hide CPU skill
+el("cpuDiffWrap").style.display = el("oppType").value==="cpu" ? "" : "none";
