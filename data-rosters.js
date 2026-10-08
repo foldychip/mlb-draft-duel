@@ -10930,7 +10930,7 @@ const PLAYERS = {
    {
     "name": "Cal Raleigh",
     "pos": "C",
-    "rating": 68
+    "rating": 92
    },
    {
     "name": "J.P. Crawford",
