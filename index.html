@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MLB Draft Duel</title>
+<style>
+  :root{
+    --bg:#0e1726; --text:#eef2f7; --card:#172338; --card-fg:#eef2f7;
+    --border:#28374f; --accent:#4ea1ff; --accent2:#ffb84e; --muted:#9fb0c8;
+    --ok:#4ade80; --warn:#fbbf24; --danger:#f87171; --field:#1d8a4a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;
+    background:var(--bg,#0e1726);color:var(--text,#eef2f7);}
+  .wrap{max-width:1000px;margin:0 auto;padding:16px}
+  h1{margin:0;font-size:26px;letter-spacing:.5px}
+  h1 .ball{color:var(--accent2)}
+  .sub{color:var(--muted);font-size:13px;margin-top:2px}
+  header{display:flex;justify-content:space-between;align-items:center;
+    padding:14px 16px;border-bottom:1px solid var(--border);
+    background:linear-gradient(180deg,#172338,#111a2b)}
+  .btn{cursor:pointer;border:1px solid var(--border);background:var(--card);
+    color:var(--text);padding:9px 14px;border-radius:9px;font-size:14px;
+    font-weight:600;transition:.15s}
+  .btn:hover{border-color:var(--accent);transform:translateY(-1px)}
+  .btn.primary{background:var(--accent);color:#06243f;border-color:var(--accent)}
+  .btn.accent{background:var(--accent2);color:#3a2600;border-color:var(--accent2)}
+  .btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;
+    padding:16px;margin-top:16px}
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:720px){.grid2{grid-template-columns:1fr}}
+  .muted{color:var(--muted)}
+  .pill{display:inline-block;padding:3px 9px;border-radius:999px;font-size:12px;
+    border:1px solid var(--border);background:#0e1726}
+  .slot{display:flex;justify-content:space-between;align-items:center;
+    padding:8px 10px;border:1px solid var(--border);border-radius:9px;margin:6px 0;
+    background:#101a2c}
+  .slot.open{border-style:dashed;opacity:.75}
+  .slot.filled{border-color:var(--ok)}
+  .slot .pos{font-weight:800;color:var(--accent);min-width:34px}
+  .slot .nm{flex:1;margin:0 10px}
+  .slot .rt{font-weight:800}
+  .teamroll{font-size:40px;font-weight:900;letter-spacing:1px;text-align:center;
+    padding:10px;color:var(--accent2)}
+  .teamroll small{display:block;font-size:14px;color:var(--muted);font-weight:600;letter-spacing:0}
+  .badge{display:inline-flex;align-items:center;justify-content:center;
+    width:52px;height:52px;border-radius:50%;font-weight:900;font-size:16px;
+    border:3px solid;letter-spacing:0;flex:none;box-shadow:0 2px 6px #0006}
+  .badge.sm{width:26px;height:26px;font-size:10px;border-width:2px}
+  .teamroll .badge{width:64px;height:64px;font-size:20px;margin:0 auto 4px}
+  .cpuBanner{margin-top:12px;padding:12px 14px;border-radius:12px;
+    border:1px solid var(--accent2);background:var(--card);
+    display:flex;align-items:center;gap:14px;animation:pop .25s ease}
+  @keyframes pop{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
+  .cpuBanner .pickline{font-size:15px}
+  .cpuBanner .pickline b{color:var(--accent2)}
+  .choices{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+  @media(max-width:600px){.choices{grid-template-columns:1fr}}
+  .choice{text-align:left;display:flex;justify-content:space-between;align-items:center}
+  .score{font-size:34px;font-weight:900}
+  .score.you{color:var(--accent)} .score.opp{color:var(--accent2)}
+  .hidden{display:none}
+  .toast{position:fixed;left:50%;top:18px;transform:translateX(-50%);
+    background:var(--card);border:1px solid var(--accent);padding:10px 18px;
+    border-radius:10px;font-weight:700;z-index:50;box-shadow:0 6px 24px #0008}
+  select,input{background:#0e1726;color:var(--text);border:1px solid var(--border);
+    border-radius:8px;padding:7px 9px;font-size:14px}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  td,th{padding:6px 8px;border-bottom:1px solid var(--border);text-align:left}
+  th{color:var(--muted);font-weight:600}
+  .win{color:var(--ok);font-weight:800}
+  .lose{color:var(--danger);font-weight:800}
+  .tie{color:var(--warn);font-weight:800}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>⚾ MLB Draft <span class="ball">Duel</span></h1>
+    <div class="sub">Roll a team • draft the best player • highest lineup wins</div>
+  </div>
+  <div class="row">
+    <button class="btn" id="modeDraft">Draft Duel</button>
+    <button class="btn" id="modeTrivia">Trivia</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <!-- SETUP -->
+  <div class="card" id="setup">
+    <h3 style="margin-top:0">New Game</h3>
+    <details style="margin-bottom:14px;border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:#101a2c">
+      <summary style="cursor:pointer;font-weight:700;color:var(--accent)">ℹ️ How are player ratings decided?</summary>
+      <div style="margin-top:10px;font-size:13px;line-height:1.55;color:var(--text)">
+        Every player gets a rating from <b>45 to 99</b> built from <b>real career performance</b>, not guesswork. The main ingredients:
+        <ul style="margin:8px 0 8px 18px;padding:0">
+          <li><b>How good they were per game</b> — hitters are judged on era-adjusted offense (OPS+), pitchers on run prevention (ERA+). This asks "how dominant when they played?"</li>
+          <li><b>Total career value</b> — a career-long measure (WAR) that rewards sustained greatness, defense, and longevity. This carries the most weight, so a long great career outranks a short hot streak.</li>
+          <li><b>Awards &amp; honors</b> — MVP and Cy Young wins give a big boost, with smaller credit for 2nd/3rd-place finishes, plus All-Star selections, Silver Sluggers, and Gold Gloves.</li>
+        </ul>
+        On top of that, a few fairness adjustments fix things a single stat misses:
+        <ul style="margin:8px 0 8px 18px;padding:0">
+          <li><b>Speed &amp; defense</b> — base-stealers and elite glovemen get credit the batting stats ignore.</li>
+          <li><b>Elite closers</b> — relief aces get a boost, since career totals undersell short-inning relievers.</li>
+          <li><b>Young stars</b> — players early in their careers are judged on their <i>pace</i>, so a dominant rookie isn't punished for a short résumé.</li>
+          <li><b>Great bats, short careers</b> — a feared slugger whose career was cut short still gets credit for the bat.</li>
+          <li><b>Hall of Famers</b> — any inducted Hall of Famer is rated at least <b>97</b>.</li>
+        </ul>
+        <span style="color:var(--muted)">Numbers are approximate, for a fun game — not official. Well-known players use real stats; a few deep-bench players are reasonable estimates.</span>
+      </div>
+    </details>
+    <div class="row" style="margin-bottom:12px">
+      <label>Opponent:
+        <select id="oppType">
+          <option value="cpu">vs Computer</option>
+          <option value="human">vs Player (pass &amp; play)</option>
+        </select>
+      </label>
+      <label>Draft input:
+        <select id="draftMode">
+          <option value="type">Type the player name</option>
+          <option value="choice">Multiple choice</option>
+        </select>
+      </label>
+      <label>Decades to include:
+        <span id="eraChecks" style="display:inline-flex;gap:10px;flex-wrap:wrap;margin-left:6px">
+          <label style="font-weight:400"><input type="checkbox" class="eraBox" value="2020s" checked> 2020s</label>
+          <label style="font-weight:400"><input type="checkbox" class="eraBox" value="2010s"> 2010s</label>
+          <label style="font-weight:400"><input type="checkbox" class="eraBox" value="2000s"> 2000s</label>
+          <label style="font-weight:400"><input type="checkbox" class="eraBox" value="1990s"> 1990s</label>
+          <label style="font-weight:400"><input type="checkbox" class="eraBox" value="1980s"> 1980s</label>
+          <label style="font-weight:400"><input type="checkbox" class="eraBox" value="1970s"> 1970s</label>
+        </span>
+      </label>
+      <label style="font-weight:400"><input type="checkbox" id="hideRatings"> Hide ratings while drafting (harder)</label>
+      <label style="font-weight:400"><input type="checkbox" id="rerollOn" checked> Allow rerolls:
+        <select id="rerollCount">
+          <option value="1">1 per side</option>
+          <option value="2">2 per side</option>
+          <option value="3" selected>3 per side</option>
+          <option value="5">5 per side</option>
+          <option value="999">Unlimited</option>
+        </select>
+      </label>
+      <label style="font-weight:400"><input type="checkbox" id="hintOn" checked> Allow hints (4 choices, points hidden):
+        <select id="hintCount">
+          <option value="1">1 per side</option>
+          <option value="2">2 per side</option>
+          <option value="3" selected>3 per side</option>
+          <option value="5">5 per side</option>
+          <option value="999">Unlimited</option>
+        </select>
+      </label>
+      <label style="font-weight:400"><input type="checkbox" id="broadInf"> Broad infield (any INF fills any INF slot)</label>
+      <label style="font-weight:400"><input type="checkbox" id="broadOf"> Broad outfield (any hitter fills an OF slot)</label>
+      <label style="font-weight:400"><input type="checkbox" id="lenientRp" checked> Lenient RP (any pitcher may fill a relief slot)</label>
+      <label id="cpuDiffWrap">CPU skill:
+        <select id="cpuDiff">
+          <option value="0.6">Rookie</option>
+          <option value="0.8" selected>Pro</option>
+          <option value="1.0">All-Star</option>
+        </select>
+      </label>
+    </div>
+    <button class="btn primary" id="startBtn">Play Ball ▶</button>
+    <div class="muted" style="margin-top:10px;font-size:12px">
+      Lineup: C, 1B, 2B, SS, 3B, OF, OF, OF, UTL, DH + 3 Starters, 2 Relievers (15 picks each).
+      Each round a team is rolled; pick an eligible player for an open slot.
+    </div>
+  </div>
+
+  <!-- DRAFT GAME -->
+  <div id="game" class="hidden">
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <div><span class="pill" id="turnPill">Your pick</span>
+             <span class="pill" id="roundPill">Round 1 / 13</span></div>
+        <div class="row">
+          <div style="text-align:center"><div class="score you" id="scoreYou">0</div><div class="muted">You</div></div>
+          <div style="font-size:22px" class="muted">vs</div>
+          <div style="text-align:center"><div class="score opp" id="scoreOpp">0</div><div class="muted" id="oppLabel">CPU</div></div>
+        </div>
+      </div>
+      <div class="teamroll" id="teamRoll">—<small id="eraRoll"></small></div>
+      <div class="row" style="justify-content:center">
+        <button class="btn accent" id="rollBtn">🎲 Roll Team</button>
+      </div>
+      <div id="cpuBanner" class="hidden"></div>
+      <div id="pickArea" class="hidden">
+        <div class="muted" id="pickPrompt" style="margin-top:10px">Type the name of a player from this team to fill an open slot:</div>
+        <div class="row" style="margin-top:8px">
+          <input id="nameInput" type="text" autocomplete="off" spellcheck="false"
+                 placeholder="e.g. Derek Jeter" style="flex:1;min-width:200px" />
+          <button class="btn primary" id="submitName">Draft ▶</button>
+        </div>
+        <div id="mcChoices" class="choices hidden" style="margin-top:10px"></div>
+        <div class="row" style="margin-top:8px">
+          <button class="btn" id="rerollBtn">🎲 Reroll team (<span id="rerollLeft">3</span>)</button>
+          <button class="btn" id="hintBtn">💡 Hint (<span id="hintLeft">3</span>)</button>
+        </div>
+        <div id="hintChoices" class="choices hidden" style="margin-top:10px"></div>
+        <div class="muted" id="openSlots" style="margin-top:8px;font-size:12px"></div>
+        <div id="pickFeedback" style="margin-top:8px;font-weight:700"></div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="card"><h4 style="margin-top:0">Your lineup</h4><div id="youRoster"></div></div>
+      <div class="card"><h4 style="margin-top:0" id="oppRosterTitle">CPU lineup</h4><div id="oppRoster"></div></div>
+    </div>
+  </div>
+
+  <!-- RESULT -->
+  <div id="result" class="card hidden"></div>
+
+  <!-- TRIVIA -->
+  <div id="trivia" class="hidden">
+    <div class="card">
+      <h3 style="margin-top:0">Guess the Player 🧢</h3>
+      <div class="muted">Name the real player who matches the team, era, and position.</div>
+      <div class="row" style="margin-top:8px;gap:10px;flex-wrap:wrap">
+        <span class="muted" style="font-size:12px">Decades:</span>
+        <label style="font-weight:400;font-size:13px"><input type="checkbox" class="trEraBox" value="2020s" checked> 2020s</label>
+        <label style="font-weight:400;font-size:13px"><input type="checkbox" class="trEraBox" value="2010s" checked> 2010s</label>
+        <label style="font-weight:400;font-size:13px"><input type="checkbox" class="trEraBox" value="2000s" checked> 2000s</label>
+        <label style="font-weight:400;font-size:13px"><input type="checkbox" class="trEraBox" value="1990s" checked> 1990s</label>
+        <label style="font-weight:400;font-size:13px"><input type="checkbox" class="trEraBox" value="1980s" checked> 1980s</label>
+        <label style="font-weight:400;font-size:13px"><input type="checkbox" class="trEraBox" value="1970s" checked> 1970s</label>
+      </div>
+      <div class="row" style="justify-content:space-between;margin-top:10px">
+        <span class="pill" id="trScore">Score 0 / 0</span>
+        <button class="btn accent" id="trNext">Next Question ▶</button>
+      </div>
+      <div id="trQ" style="font-size:20px;font-weight:800;margin:14px 0"></div>
+      <div class="choices" id="trChoices"></div>
+      <div id="trFeedback" style="margin-top:12px;font-weight:700"></div>
+    </div>
+  </div>
+</div>
+
+<script src="data.js"></script>
+<script src="data-rosters.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
